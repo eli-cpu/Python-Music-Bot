@@ -26,6 +26,7 @@ class MusicPlayer:
         self.voice_client = None
         self.is_playing = False
         self.volume = 0.5
+        self.last_text_channel = None  # Store last text channel for notifications
 
         # Initialize Spotify client
         if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
@@ -77,6 +78,9 @@ class MusicPlayer:
         if not interaction.user.voice:
             await interaction.followup.send("❌ You must be in a voice channel to play music!")
             return
+
+        # Store the text channel for future notifications
+        self.last_text_channel = interaction.channel
 
         voice_channel = interaction.user.voice.channel
 
@@ -134,6 +138,9 @@ class MusicPlayer:
         # We can't directly send messages here, but we can prepare for the next song
         print(f"Queue has {len(self.queue)} songs remaining")
 
+        # Check if we should leave the channel after song ends
+        self._schedule_leave_check()
+
     async def add_to_queue(self, song):
         """Add a song to the queue"""
         self.queue.append(song)
@@ -180,6 +187,73 @@ class MusicPlayer:
             return True
         return False
 
+    def _schedule_leave_check(self):
+        """Schedule a check to see if bot should leave the channel"""
+        # This will be called from a separate thread, so we need to handle it carefully
+        # We'll set a flag that the main bot can check
+        self._should_check_leave = True
+
+    def should_check_leave(self):
+        """Check if we should verify if bot should leave"""
+        if hasattr(self, '_should_check_leave') and self._should_check_leave:
+            self._should_check_leave = False
+            return True
+        return False
+
+    async def check_and_leave_if_empty(self, interaction=None, immediate_check=False):
+        """Check if the bot should leave the voice channel and leave if empty"""
+        if not self.voice_client or not self.voice_client.is_connected():
+            return
+
+        # Count non-bot members in the voice channel
+        channel = self.voice_client.channel
+        human_members = [member for member in channel.members if not member.bot]
+
+        # If no humans left in the channel
+        if len(human_members) == 0:
+            if immediate_check:
+                # Immediate check - leave right away
+                print(f"No users in voice channel {channel.name}. Leaving immediately.")
+                await self.voice_client.disconnect()
+                self.voice_client = None
+                self.is_playing = False
+                self.current_song = None
+                self.queue.clear()
+
+                # Send notification message
+                await self._send_leave_notification(channel.name, "all users left")
+
+                if interaction:
+                    try:
+                        await interaction.followup.send("👋 Left voice channel (no users remaining)")
+                    except:
+                        pass  # Interaction might be expired
+            else:
+                # Delayed check - wait 30 seconds to allow users to rejoin
+                print(f"No users in voice channel {channel.name}. Leaving in 30 seconds...")
+
+                # Wait 30 seconds to allow users to rejoin
+                await asyncio.sleep(30)
+
+                # Check again in case someone rejoined
+                human_members = [member for member in channel.members if not member.bot]
+                if len(human_members) == 0:
+                    print(f"Still no users in voice channel. Leaving now.")
+                    await self.voice_client.disconnect()
+                    self.voice_client = None
+                    self.is_playing = False
+                    self.current_song = None
+                    self.queue.clear()
+
+                    # Send notification message
+                    await self._send_leave_notification(channel.name, "channel remained empty")
+
+                    if interaction:
+                        try:
+                            await interaction.followup.send("👋 Left voice channel (no users remaining)")
+                        except:
+                            pass  # Interaction might be expired
+
     async def play_previous(self, interaction):
         """Play the previous song from history"""
         if not self.history:
@@ -196,6 +270,23 @@ class MusicPlayer:
         # Play the previous song
         await self.stream_and_play(interaction, previous_song)
         return True
+
+    async def _send_leave_notification(self, voice_channel_name, reason):
+        """Send a notification message when the bot leaves due to empty channel"""
+        if not self.last_text_channel:
+            return
+
+        try:
+            embed = discord.Embed(
+                title="🎵 Music Stopped - No One in Voice Channel",
+                description=f"I automatically left **{voice_channel_name}** because {reason}.\n\n"
+                           f"**Music stopped** and **queue cleared** to save server resources.",
+                color=discord.Color.orange()
+            )
+
+            await self.last_text_channel.send(embed=embed)
+        except Exception as e:
+            print(f"Failed to send leave notification: {e}")
 
 # Create global music player instance
 music_player = MusicPlayer()

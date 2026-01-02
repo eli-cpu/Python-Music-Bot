@@ -34,11 +34,19 @@ SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
 pip install -r requirements.txt
 ```
 
-**Note:** This bot requires FFmpeg to be installed on your system for audio playback. Install it using:
+**Important Dependencies:**
 
-- **Windows:** Download from [ffmpeg.org](https://ffmpeg.org/download.html)
-- **Linux:** `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo dnf install ffmpeg` (Fedora)
-- **macOS:** `brew install ffmpeg`
+- **FFmpeg** (Required for audio processing):
+
+  - **Windows:** Download from [ffmpeg.org](https://ffmpeg.org/download.html)
+  - **Linux:** `sudo apt install ffmpeg` (Ubuntu/Debian) or `sudo dnf install ffmpeg` (Fedora)
+  - **macOS:** `brew install ffmpeg`
+
+- **PyNaCl** (Required for Discord voice functionality):
+  ```bash
+  pip install PyNaCl>=1.5.0
+  ```
+  **Note:** Without PyNaCl, voice commands like `/join`, `/play`, etc. will fail with connection errors.
 
 ### 4. Run the Bot
 
@@ -133,6 +141,7 @@ The `/play` command accepts different types of input and behaves as follows:
 ## 🎛️ **All Commands - Fully Implemented:**
 
 ### **Music Playback:**
+
 - `/play <query>` - Play music from YouTube, Spotify, or search
 - `/skip` - Skip current song and play next in queue
 - `/stop` - Stop playback and clear queue
@@ -141,18 +150,58 @@ The `/play` command accepts different types of input and behaves as follows:
 - `/backward` - Play previous song from history
 
 ### **Queue Management:**
+
 - `/queue` - Show current queue with song details
 - `/clear` - Clear all songs from queue
 
 ### **Voice Control:**
+
 - `/join` - Join your voice channel
 - `/leave` - Leave voice channel
 - `/volume <0-100>` - Set playback volume
 
 ### **Information:**
+
 - `/nowplaying` - Show current song with thumbnail
 
+## 🤖 **Smart Auto-Leave Feature**
+
+The bot automatically leaves voice channels when no users are present and sends helpful notifications:
+
+### **When Music Ends:**
+
+- After a song finishes, if no users are in the voice channel, the bot waits 30 seconds
+- If still no users after 30 seconds, the bot automatically leaves and clears the queue
+- **Sends a notification** explaining why music stopped
+
+### **When Users Leave:**
+
+- If the last human user leaves the voice channel (while music is playing or not), the bot immediately leaves
+- **Sends an immediate notification** about the empty channel
+- No waiting period when users actively leave
+
+### **Notification Messages:**
+
+The bot sends clear embed messages in the text channel where music commands were last used:
+
+```
+🎵 Music Stopped - No One in Voice Channel
+
+I automatically left [channel name] because [reason].
+
+Music stopped and queue cleared to save server resources.
+```
+
+### **Benefits:**
+
+- ✅ **Saves server resources** - Bot doesn't stay in empty channels
+- ✅ **Clear communication** - Users know why music stopped
+- ✅ **Automatic cleanup** - Queue is cleared when leaving
+- ✅ **Smart timing** - Immediate leave when users leave, delayed when music ends
+- ✅ **User-friendly** - Helpful notifications explain what happened
+
 ### 🎯 **Fully Functional Without API Keys:**
+
 - ✅ YouTube URLs and search queries
 - ✅ All voice and queue commands
 - ✅ Pause/resume, skip, volume control
@@ -160,6 +209,7 @@ The `/play` command accepts different types of input and behaves as follows:
 - ✅ Song history and backward functionality
 
 ### 🔑 **Optional Enhancement:**
+
 - ✅ Spotify URL support (requires API credentials)
 
 ## Testing the Bot

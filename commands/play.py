@@ -5,6 +5,9 @@ async def play_command(interaction: discord.Interaction, query: str, music_playe
     """Play music from Spotify URL, YouTube URL, or search query"""
     await interaction.response.defer()
 
+    # Store the text channel for future notifications
+    music_player.last_text_channel = interaction.channel
+
     # Check if it's a Spotify URL
     if 'spotify.com' in query:
         spotify_info = music_player.extract_spotify_info(query)

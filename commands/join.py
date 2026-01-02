@@ -6,6 +6,9 @@ async def join_command(interaction: discord.Interaction, music_player):
         await interaction.response.send_message("❌ You must be in a voice channel first!")
         return
 
+    # Store the text channel for future notifications
+    music_player.last_text_channel = interaction.channel
+
     voice_channel = interaction.user.voice.channel
 
     if music_player.voice_client and music_player.voice_client.is_connected():
