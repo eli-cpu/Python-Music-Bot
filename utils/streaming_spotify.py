@@ -1,0 +1,201 @@
+import os
+import re
+import discord
+from collections import deque
+
+# Import YouTube streamer
+from .streaming_youtube import youtube_streamer
+
+# Get Spotify credentials from environment
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+
+class Song:
+    def __init__(self, title, url, duration, thumbnail=None, requester=None):
+        self.title = title
+        self.url = url
+        self.duration = duration
+        self.thumbnail = thumbnail
+        self.requester = requester
+
+class MusicPlayer:
+    def __init__(self):
+        self.queue = deque()
+        self.history = deque(maxlen=10)  # Keep last 10 songs for backward functionality
+        self.current_song = None
+        self.voice_client = None
+        self.is_playing = False
+        self.volume = 0.5
+
+        # Initialize Spotify client
+        if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
+            try:
+                import spotipy
+                from spotipy.oauth2 import SpotifyClientCredentials
+
+                client_credentials_manager = SpotifyClientCredentials(
+                    client_id=SPOTIFY_CLIENT_ID,
+                    client_secret=SPOTIFY_CLIENT_SECRET
+                )
+                self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+            except Exception as e:
+                print(f"Failed to initialize Spotify client: {e}")
+                self.spotify = None
+        else:
+            print("Spotify credentials not found. Spotify links won't work.")
+            self.spotify = None
+
+    def extract_spotify_info(self, url):
+        """Extract track information from Spotify URL"""
+        if not self.spotify:
+            return None
+
+        # Extract track ID from Spotify URL
+        match = re.search(r'spotify\.com/track/([a-zA-Z0-9]+)', url)
+        if not match:
+            return None
+
+        track_id = match.group(1)
+
+        try:
+            track = self.spotify.track(track_id)
+            return {
+                'title': track['name'],
+                'artist': ', '.join([artist['name'] for artist in track['artists']]),
+                'query': f"{track['name']} {track['artists'][0]['name']}"
+            }
+        except Exception as e:
+            print(f"Error extracting Spotify info: {e}")
+            return None
+
+    async def search_youtube(self, query):
+        """Search YouTube and return video info using the YouTube streamer"""
+        return await youtube_streamer.search_youtube(query)
+
+    async def stream_and_play(self, interaction, song):
+        """Stream and play a song"""
+        if not interaction.user.voice:
+            await interaction.followup.send("❌ You must be in a voice channel to play music!")
+            return
+
+        voice_channel = interaction.user.voice.channel
+
+        # Connect to voice channel if not already connected
+        if not self.voice_client or not self.voice_client.is_connected():
+            try:
+                self.voice_client = await voice_channel.connect()
+            except Exception as e:
+                await interaction.followup.send(f"❌ Failed to connect to voice channel: {e}")
+                return
+        elif self.voice_client.channel != voice_channel:
+            await self.voice_client.move_to(voice_channel)
+
+        # Stream audio in real-time
+        try:
+            # Get streaming URL from YouTube streamer
+            stream_url = await youtube_streamer.get_stream_url(song.url)
+
+            if not stream_url:
+                await interaction.followup.send("❌ Failed to get streaming URL")
+                return
+
+            # Stream audio using YouTube streamer
+            success = await youtube_streamer.stream_audio(self.voice_client, stream_url, lambda e: self._after_playing(e))
+
+            if success:
+                # Add current song to history if there was one
+                if self.current_song:
+                    self.history.append(self.current_song)
+
+                self.current_song = song
+                self.is_playing = True
+                await interaction.followup.send(f"🎵 Now streaming: **{song.title}**")
+            else:
+                await interaction.followup.send("❌ Failed to start audio stream")
+
+        except Exception as e:
+            print(f"Error streaming song: {e}")
+            await interaction.followup.send(f"❌ Error streaming song: {str(e)}")
+
+    def _after_playing(self, error=None):
+        """Called when audio finishes playing"""
+        if error:
+            print(f"Playback error: {error}")
+
+        # Add current song to history if it exists
+        if self.current_song:
+            self.history.append(self.current_song)
+
+        self.is_playing = False
+        self.current_song = None
+
+        # Auto-play next song in queue if available
+        # Note: This is called from Discord's voice client, which runs in a separate thread
+        # We can't directly send messages here, but we can prepare for the next song
+        print(f"Queue has {len(self.queue)} songs remaining")
+
+    async def add_to_queue(self, song):
+        """Add a song to the queue"""
+        self.queue.append(song)
+
+    def clear_queue(self):
+        """Clear the music queue"""
+        self.queue.clear()
+
+    def get_queue_info(self):
+        """Get information about the current queue"""
+        return {
+            'current': self.current_song,
+            'queue': list(self.queue),
+            'is_playing': self.is_playing
+        }
+
+    def set_volume(self, volume_level):
+        """Set the playback volume (0-100)"""
+        # Clamp volume between 0 and 100
+        self.volume = max(0, min(100, volume_level))
+
+        # If currently playing, adjust volume
+        if self.voice_client and self.voice_client.is_playing():
+            # Discord.py doesn't have direct volume control, but we can adjust FFmpeg volume
+            # This would require restarting the stream with new volume, which is complex
+            # For now, we'll just store the volume for future songs
+            pass
+
+        return self.volume
+
+    def pause(self):
+        """Pause the current playback"""
+        if self.voice_client and self.voice_client.is_playing():
+            self.voice_client.pause()
+            self.is_playing = False
+            return True
+        return False
+
+    def resume(self):
+        """Resume playback"""
+        if self.voice_client and self.voice_client.is_paused():
+            self.voice_client.resume()
+            self.is_playing = True
+            return True
+        return False
+
+    async def play_previous(self, interaction):
+        """Play the previous song from history"""
+        if not self.history:
+            await interaction.followup.send("❌ No previous song to play!")
+            return False
+
+        # Get the last song from history
+        previous_song = self.history.pop()
+
+        # Add current song to history if exists
+        if self.current_song:
+            self.history.append(self.current_song)
+
+        # Play the previous song
+        await self.stream_and_play(interaction, previous_song)
+        return True
+
+# Create global music player instance
+music_player = MusicPlayer()
