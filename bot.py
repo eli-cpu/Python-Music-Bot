@@ -22,6 +22,9 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 # Create the music player instance
 music_player = MusicPlayer()
 
+# Setup all commands from the commands folder BEFORE bot starts
+command_count = setup_commands(bot, music_player)
+
 @bot.event
 async def on_ready():
     """Called when the bot is ready and connected to Discord"""
@@ -34,9 +37,6 @@ async def on_ready():
         print(f"Synced {len(synced)} command(s)")
     except Exception as e:
         print(f"Failed to sync commands: {e}")
-
-    # Setup all commands from the commands folder
-    command_count = setup_commands(bot, music_player)
 
 # Run the bot
 if TOKEN:
