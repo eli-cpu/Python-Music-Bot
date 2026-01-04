@@ -80,15 +80,21 @@ Once the bot is running and invited to your server, you should see:
 - Basic bot setup with Discord connection
 - **🎵 Complete Music Bot with Queue System**
 - **Real-time music streaming with Spotify integration**
+- **🛠️ Stream Recovery System** - Automatically recovers from network interruptions
+  - Handles YouTube stream timeouts and connection drops
+  - Refreshes expired stream URLs automatically
+  - Resumes playback from the correct position after recovery
+  - Graceful fallback if recovery fails
 - **Modular architecture**:
   - `utils/` package - Music streaming functionality
     - `utils/streaming_spotify.py` - Spotify integration and music player
     - `utils/streaming_youtube.py` - YouTube streaming functionality
-  - `commands/` package - Auto-discovered Discord commands (12 commands)
+  - `commands/` package - Auto-discovered Discord commands (14 commands)
     - Each command in its own file (e.g., `commands/play.py`)
     - Automatic command loading - just add new `.py` files!
 - **Queue system** - Add multiple songs, skip, pause/resume, volume control
 - **History tracking** - Go back to previous songs
+- **Auto-Control Panel** - Interactive UI automatically appears when songs start/change
 - **Testing tools** - Run `python test_all.py` to verify functionality
 
 ## Music Playback Guide
@@ -163,6 +169,42 @@ The `/play` command accepts different types of input and behaves as follows:
 ### **Information:**
 
 - `/nowplaying` - Show current song with thumbnail
+- `/control` - Interactive control panel with clickable buttons
+
+### **Navigation:**
+
+- `/forward` - Seek forward 10 seconds in current song
+- `/backward` - Seek backward 10 seconds in current song
+
+## 🎛️ **Interactive Control Panel**
+
+**✨ Auto-Appearing UI**: The control panel automatically appears in the text channel whenever:
+
+- A new song starts playing (`/play`, `/skip`, etc.)
+- A song finishes and the next one begins
+- The bot recovers from a stream interruption
+
+Use `/control` to manually display an interactive panel with clickable buttons for easy music control:
+
+### **First Row - Playback Controls:**
+
+- **⏯️ Play/Pause** - Toggle between play and pause (button changes dynamically)
+- **⏭️ Skip** - Skip to next song in queue
+- **⏮️ Back** - Play previous song from history
+- **⏭️ Forward** - Seek forward 10 seconds in current song
+- **⏮️ Backward** - Seek backward 10 seconds in current song
+
+### **Second Row - Management:**
+
+- **🗑️ Clear** - Clear all songs from queue
+- **🔗 GitHub** - Link to project repository
+
+### **Features:**
+
+- ✅ **Real-time updates** - Current song and queue status
+- ✅ **Smart buttons** - Play/Pause button changes based on current state
+- ✅ **Interactive feedback** - Buttons respond with confirmation messages
+- ✅ **Queue display** - Shows upcoming songs in the panel
 
 ## 🤖 **Smart Auto-Leave Feature**
 
@@ -313,6 +355,32 @@ Tests:
 
 ## Troubleshooting
 
+### Common Issues
+
 - **Bot not responding**: Make sure your `.env` file has the correct token
 - **Permission errors**: Ensure the bot has proper permissions in your server
 - **Connection issues**: Check that your bot token is valid and hasn't expired
+
+### Stream Issues & Recovery
+
+The bot includes an **automatic stream recovery system** that handles common streaming problems:
+
+- **"Connection reset by peer" or TLS errors**: The bot will automatically attempt to refresh the stream URL and resume playback from the correct position
+- **Stream timeouts**: If YouTube streams expire (typically after 6+ hours), the bot fetches a fresh URL and continues playing
+- **Network interruptions**: Temporary connection issues are handled with automatic retry logic and better FFmpeg buffering
+
+**What happens during recovery:**
+
+1. Stream failure is detected
+2. Bot waits 1 second to avoid rapid retries
+3. Fetches a fresh stream URL from YouTube
+4. Resumes playback from the current position
+5. Shows success/failure messages in the console
+
+**If recovery fails:**
+
+- The bot gracefully stops the current song
+- Moves to the next song in queue (if available)
+- Sends appropriate user notifications
+
+This system ensures uninterrupted music playback even during network issues or long listening sessions.
