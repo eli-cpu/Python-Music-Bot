@@ -10,10 +10,10 @@ async def play_command(interaction: discord.Interaction, query: str, music_playe
 
     # Check if it's a Spotify URL
     if 'spotify.com' in query:
-        spotify_info = music_player.extract_spotify_info(query)
+        spotify_info = await music_player.extract_spotify_info(query)
         if spotify_info:
             search_query = spotify_info['query']
-            await interaction.followup.send(f"🔍 Searching YouTube for: **{spotify_info['title']}** by **{spotify_info['artist']}**")
+            await interaction.followup.send(f"🔍 Searching YouTube for: **{spotify_info['title']}**")
         else:
             await interaction.followup.send("❌ Invalid Spotify URL or failed to extract track information")
             return

@@ -8,7 +8,7 @@ from collections import deque
 # Import YouTube streamer
 from .streaming_youtube import youtube_streamer
 
-# Get Spotify credentials from environment
+# Spotify credentials (optional - no longer required for basic Spotify URL support)
 SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
 SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
 
@@ -54,7 +54,7 @@ class MusicPlayer:
         return self.current_position + elapsed
         self.last_text_channel = None  # Store last text channel for notifications
 
-        # Initialize Spotify client
+        # Initialize Spotify client (optional - for enhanced features)
         if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
             try:
                 import spotipy
@@ -65,34 +65,52 @@ class MusicPlayer:
                     client_secret=SPOTIFY_CLIENT_SECRET
                 )
                 self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+                print("Spotify API client initialized successfully.")
             except Exception as e:
                 print(f"Failed to initialize Spotify client: {e}")
                 self.spotify = None
         else:
-            print("Spotify credentials not found. Spotify links won't work.")
+            print("Spotify API credentials not found. Using oEmbed fallback for Spotify URLs.")
             self.spotify = None
 
-    def extract_spotify_info(self, url):
-        """Extract track information from Spotify URL"""
-        if not self.spotify:
-            return None
-
+    async def extract_spotify_info(self, url):
+        """Extract track information from Spotify URL using oEmbed (no API key required)"""
         # Extract track ID from Spotify URL
         match = re.search(r'spotify\.com/track/([a-zA-Z0-9]+)', url)
         if not match:
             return None
 
-        track_id = match.group(1)
-
         try:
-            track = self.spotify.track(track_id)
-            return {
-                'title': track['name'],
-                'artist': ', '.join([artist['name'] for artist in track['artists']]),
-                'query': f"{track['name']} {track['artists'][0]['name']}"
-            }
+            # Use Spotify's oEmbed endpoint (no API key required)
+            import aiohttp
+
+            oembed_url = f"https://open.spotify.com/oembed?url={url}"
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(oembed_url) as response:
+                    if response.status == 200:
+                        data = await response.json()
+
+                        # Extract title from oEmbed data
+                        title_text = data.get('title', '')
+
+                        if not title_text:
+                            return None
+
+                        # Spotify oEmbed only provides the track title, not the artist
+                        # We'll use just the title for YouTube search - it should be sufficient
+                        # for most popular songs
+                        return {
+                            'title': title_text,
+                            'artist': 'Unknown (from Spotify)',  # Placeholder
+                            'query': title_text  # Search YouTube with just the title
+                        }
+                    else:
+                        print(f"oEmbed request failed with status: {response.status}")
+                        return None
+
         except Exception as e:
-            print(f"Error extracting Spotify info: {e}")
+            print(f"Error extracting Spotify info via oEmbed: {e}")
             return None
 
     async def search_youtube(self, query):
