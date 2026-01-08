@@ -100,7 +100,7 @@ class MusicPlayer:
                         # Spotify oEmbed only provides the track title, not the artist
                         # We'll use just the title for YouTube search - it should be sufficient
                         # for most popular songs
-                        return {
+            return {
                             'title': title_text,
                             'artist': 'Unknown (from Spotify)',  # Placeholder
                             'query': title_text  # Search YouTube with just the title
@@ -221,8 +221,10 @@ class MusicPlayer:
                 view.play_pause.label = "▶️ Resume"
                 view.play_pause.emoji = "▶️"
 
-            # Create compact embed with current status above buttons
+            # Create embed with current status
             embed = discord.Embed(
+                title="🎵 Music Control Panel",
+                description="Use the buttons below to control music playback!",
                 color=discord.Color.blue()
             )
 
@@ -230,30 +232,30 @@ class MusicPlayer:
             if self.current_song:
                 status = "▶️ Playing" if self.is_playing else "⏸️ Paused"
                 embed.add_field(
-                    name="🎵 Current Song",
-                    value=f"{status} **{self.current_song.title}**\nRequested by: {self.current_song.requester.mention}",
+                    name=f"{status}: {self.current_song.title}",
+                    value=f"Requested by: {self.current_song.requester.mention}",
                     inline=False
                 )
 
             # Add queue info
             queue_info = self.get_queue_info()
             if queue_info['queue']:
-                queue_text = f"📋 **{len(queue_info['queue'])}** song(s) in queue"
+                queue_text = f"**{len(queue_info['queue'])}** song(s) in queue"
                 if len(queue_info['queue']) <= 3:
                     queue_text += "\n" + "\n".join([f"• {song.title}" for song in queue_info['queue'][:3]])
                 embed.add_field(
-                    name="‎",  # Invisible character for spacing
+                    name="📋 Queue",
                     value=queue_text,
                     inline=False
                 )
             else:
                 embed.add_field(
-                    name="‎",  # Invisible character for spacing
-                    value="📋 Queue is empty",
+                    name="📋 Queue",
+                    value="Empty",
                     inline=False
                 )
 
-            embed.set_footer(text="🎛️ Use the buttons below to control playback")
+            embed.set_footer(text="Click buttons to control music • Panel auto-updates")
 
             # Send the control panel
             await self.last_text_channel.send(embed=embed, view=view)

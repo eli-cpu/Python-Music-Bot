@@ -15,7 +15,7 @@ class MusicControlView(ui.View):
             style=discord.ButtonStyle.link,
             url="https://github.com/eli-cpu",
             emoji="🔗",
-            row=3
+            row=1
         )
         self.add_item(github_button)
 
@@ -62,7 +62,7 @@ class MusicControlView(ui.View):
         if success:
             await interaction.followup.send(f"⏮️ Playing previous song: **{self.music_player.current_song.title}**", ephemeral=True)
 
-    @ui.button(label="⏯️ Play/Pause", style=discord.ButtonStyle.primary, emoji="⏯️", row=0)
+    @ui.button(label="⏯️ Play/Pause", style=discord.ButtonStyle.primary, emoji="⏯️")
     async def play_pause(self, interaction: discord.Interaction, button: ui.Button):
         """Toggle play/pause"""
         await interaction.response.defer(ephemeral=True)
@@ -92,29 +92,29 @@ class MusicControlView(ui.View):
             else:
                 await interaction.followup.send("❌ Failed to resume!", ephemeral=True)
 
-    @ui.button(label="⏮️ Back", style=discord.ButtonStyle.secondary, emoji="⏮️", row=1)
+    @ui.button(label="⏭️ Skip", style=discord.ButtonStyle.secondary, emoji="⏭️")
+    async def skip(self, interaction: discord.Interaction, button: ui.Button):
+        """Skip current song (same as Forward)"""
+        await self._skip_song(interaction)
+
+    @ui.button(label="⏮️ Back", style=discord.ButtonStyle.secondary, emoji="⏮️")
     async def back(self, interaction: discord.Interaction, button: ui.Button):
         """Go back to previous song"""
         await self._go_back(interaction)
 
-    @ui.button(label="⏭️ Skip", style=discord.ButtonStyle.secondary, emoji="⏭️", row=1)
-    async def skip(self, interaction: discord.Interaction, button: ui.Button):
-        """Skip current song"""
-        await self._skip_song(interaction)
-
-    @ui.button(label="⏮️ Backward", style=discord.ButtonStyle.secondary, emoji="⏮️", row=2)
-    async def backward_button(self, interaction: discord.Interaction, button: ui.Button):
-        """Seek backward 10 seconds in current song"""
-        await interaction.response.defer(ephemeral=True)
-        await self.music_player.seek_backward(interaction, 10)
-
-    @ui.button(label="⏭️ Forward", style=discord.ButtonStyle.secondary, emoji="⏭️", row=2)
+    @ui.button(label="⏭️ Forward", style=discord.ButtonStyle.secondary, emoji="⏭️")
     async def forward(self, interaction: discord.Interaction, button: ui.Button):
         """Seek forward 10 seconds in current song"""
         await interaction.response.defer(ephemeral=True)
         await self.music_player.seek_forward(interaction, 10)
 
-    @ui.button(label="🗑️ Clear", style=discord.ButtonStyle.danger, emoji="🗑️", row=3)
+    @ui.button(label="⏮️ Backward", style=discord.ButtonStyle.secondary, emoji="⏮️")
+    async def backward_button(self, interaction: discord.Interaction, button: ui.Button):
+        """Seek backward 10 seconds in current song"""
+        await interaction.response.defer(ephemeral=True)
+        await self.music_player.seek_backward(interaction, 10)
+
+    @ui.button(label="🗑️ Clear", style=discord.ButtonStyle.danger, emoji="🗑️", row=1)
     async def clear(self, interaction: discord.Interaction, button: ui.Button):
         """Clear the music queue"""
         queue_info = self.music_player.get_queue_info()
