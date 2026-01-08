@@ -141,8 +141,10 @@ async def control_command(interaction: discord.Interaction, music_player):
         view.play_pause.label = "▶️ Resume"
         view.play_pause.emoji = "▶️"
 
-    # Create compact embed with current status above buttons
+    # Create embed with current status
     embed = discord.Embed(
+        title="🎵 Music Control Panel",
+        description="Use the buttons below to control music playback!",
         color=discord.Color.blue()
     )
 
@@ -150,30 +152,30 @@ async def control_command(interaction: discord.Interaction, music_player):
     if music_player.current_song:
         status = "▶️ Playing" if music_player.is_playing else "⏸️ Paused"
         embed.add_field(
-            name="🎵 Current Song",
-            value=f"{status} **{music_player.current_song.title}**\nRequested by: {music_player.current_song.requester.mention}",
+            name=f"{status}: {music_player.current_song.title}",
+            value=f"Requested by: {music_player.current_song.requester.mention}",
             inline=False
         )
 
     # Add queue info
     queue_info = music_player.get_queue_info()
     if queue_info['queue']:
-        queue_text = f"📋 **{len(queue_info['queue'])}** song(s) in queue"
+        queue_text = f"**{len(queue_info['queue'])}** song(s) in queue"
         if len(queue_info['queue']) <= 3:
             queue_text += "\n" + "\n".join([f"• {song.title}" for song in queue_info['queue'][:3]])
         embed.add_field(
-            name="‎",  # Invisible character for spacing
+            name="📋 Queue",
             value=queue_text,
             inline=False
         )
     else:
         embed.add_field(
-            name="‎",  # Invisible character for spacing
-            value="📋 Queue is empty",
+            name="📋 Queue",
+            value="Empty",
             inline=False
         )
 
-    embed.set_footer(text="🎛️ Use the buttons below to control playback")
+    embed.set_footer(text="Click buttons to control music • Panel auto-updates")
 
     await interaction.response.send_message(embed=embed, view=view)
 
