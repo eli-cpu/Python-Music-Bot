@@ -20,13 +20,15 @@ Create a `.env` file in the project root with your bot credentials:
 ```
 DISCORD_TOKEN=your_bot_token_here
 DISCORD_CLIENT_ID=your_client_id_here
+# Optional: Spotify API credentials for enhanced features
 SPOTIFY_CLIENT_ID=your_spotify_client_id_here
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret_here
 ```
 
 - Replace `your_bot_token_here` with the bot token from the "Bot" section
 - Replace `your_client_id_here` with the Application ID from the "General Information" section
-- For Spotify API: Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), create an app, and copy the Client ID and Client Secret
+- **Spotify API credentials are optional** - Basic Spotify URL support works without them using Spotify's public oEmbed API
+- For enhanced Spotify features: Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard), create an app, and copy the Client ID and Client Secret
 
 ### 3. Install Dependencies
 
@@ -123,26 +125,26 @@ The `/play` command accepts different types of input and behaves as follows:
 
 **Result:** ✅ Searches YouTube and plays the best match
 
-#### 🎼 **Spotify URLs** (Requires Spotify API credentials)
+#### 🎼 **Spotify URLs** (Works without API credentials!)
 
 ```
-/play https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
-/play https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=abc123
+https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC
+https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=abc123
 ```
 
-**Result:**
+**Result:** ✅ Extracts track info using Spotify's public oEmbed API, searches YouTube, plays match
 
-- ✅ **With Spotify credentials**: Extracts track info, searches YouTube, plays match
-- ❌ **Without Spotify credentials**: Shows error message
+**Note:** Spotify API credentials are optional and provide enhanced features, but basic Spotify URL support works without them.
 
 #### 📝 **What Happens Internally:**
 
 1. **YouTube URL**: Direct streaming from the provided URL
 2. **Search Query**: yt-dlp searches YouTube, picks top result, streams it
 3. **Spotify URL**:
-   - Extracts track title/artist using Spotify API
-   - Searches YouTube for "title artist"
+   - Extracts track title using Spotify's public oEmbed API (no credentials needed)
+   - Searches YouTube for the track title
    - Streams the best YouTube match
+   - _Note:_ Artist information is not available without Spotify API credentials
 
 ## 🎛️ **All Commands - Fully Implemented:**
 
@@ -245,6 +247,7 @@ Music stopped and queue cleared to save server resources.
 ### 🎯 **Fully Functional Without API Keys:**
 
 - ✅ YouTube URLs and search queries
+- ✅ **Spotify URLs** (using public oEmbed API)
 - ✅ All voice and queue commands
 - ✅ Pause/resume, skip, volume control
 - ✅ Queue system with auto-play next
@@ -252,7 +255,7 @@ Music stopped and queue cleared to save server resources.
 
 ### 🔑 **Optional Enhancement:**
 
-- ✅ Spotify URL support (requires API credentials)
+- ✅ Spotify API integration (provides additional metadata and features)
 
 ## Testing the Bot
 
