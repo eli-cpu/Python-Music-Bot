@@ -15,7 +15,7 @@ class MusicControlView(ui.View):
             style=discord.ButtonStyle.link,
             url="https://github.com/eli-cpu",
             emoji="🔗",
-            row=1
+            row=3
         )
         self.add_item(github_button)
 
@@ -62,7 +62,7 @@ class MusicControlView(ui.View):
         if success:
             await interaction.followup.send(f"⏮️ Playing previous song: **{self.music_player.current_song.title}**", ephemeral=True)
 
-    @ui.button(label="⏯️ Play/Pause", style=discord.ButtonStyle.primary, emoji="⏯️")
+    @ui.button(label="⏯️ Play/Pause", style=discord.ButtonStyle.primary, emoji="⏯️", row=0)
     async def play_pause(self, interaction: discord.Interaction, button: ui.Button):
         """Toggle play/pause"""
         await interaction.response.defer(ephemeral=True)
@@ -92,29 +92,29 @@ class MusicControlView(ui.View):
             else:
                 await interaction.followup.send("❌ Failed to resume!", ephemeral=True)
 
-    @ui.button(label="⏭️ Skip", style=discord.ButtonStyle.secondary, emoji="⏭️")
-    async def skip(self, interaction: discord.Interaction, button: ui.Button):
-        """Skip current song (same as Forward)"""
-        await self._skip_song(interaction)
-
-    @ui.button(label="⏮️ Back", style=discord.ButtonStyle.secondary, emoji="⏮️")
+    @ui.button(label="⏮️ Back", style=discord.ButtonStyle.secondary, emoji="⏮️", row=1)
     async def back(self, interaction: discord.Interaction, button: ui.Button):
         """Go back to previous song"""
         await self._go_back(interaction)
 
-    @ui.button(label="⏭️ Forward", style=discord.ButtonStyle.secondary, emoji="⏭️")
-    async def forward(self, interaction: discord.Interaction, button: ui.Button):
-        """Seek forward 10 seconds in current song"""
-        await interaction.response.defer(ephemeral=True)
-        await self.music_player.seek_forward(interaction, 10)
+    @ui.button(label="⏭️ Skip", style=discord.ButtonStyle.secondary, emoji="⏭️", row=1)
+    async def skip(self, interaction: discord.Interaction, button: ui.Button):
+        """Skip current song"""
+        await self._skip_song(interaction)
 
-    @ui.button(label="⏮️ Backward", style=discord.ButtonStyle.secondary, emoji="⏮️")
+    @ui.button(label="⏮️ Backward", style=discord.ButtonStyle.secondary, emoji="⏮️", row=2)
     async def backward_button(self, interaction: discord.Interaction, button: ui.Button):
         """Seek backward 10 seconds in current song"""
         await interaction.response.defer(ephemeral=True)
         await self.music_player.seek_backward(interaction, 10)
 
-    @ui.button(label="🗑️ Clear", style=discord.ButtonStyle.danger, emoji="🗑️", row=1)
+    @ui.button(label="⏭️ Forward", style=discord.ButtonStyle.secondary, emoji="⏭️", row=2)
+    async def forward(self, interaction: discord.Interaction, button: ui.Button):
+        """Seek forward 10 seconds in current song"""
+        await interaction.response.defer(ephemeral=True)
+        await self.music_player.seek_forward(interaction, 10)
+
+    @ui.button(label="🗑️ Clear", style=discord.ButtonStyle.danger, emoji="🗑️", row=3)
     async def clear(self, interaction: discord.Interaction, button: ui.Button):
         """Clear the music queue"""
         queue_info = self.music_player.get_queue_info()
@@ -141,10 +141,8 @@ async def control_command(interaction: discord.Interaction, music_player):
         view.play_pause.label = "▶️ Resume"
         view.play_pause.emoji = "▶️"
 
-    # Create embed with current status
+    # Create compact embed with current status above buttons
     embed = discord.Embed(
-        title="🎵 Music Control Panel",
-        description="Use the buttons below to control music playback!",
         color=discord.Color.blue()
     )
 
@@ -152,30 +150,30 @@ async def control_command(interaction: discord.Interaction, music_player):
     if music_player.current_song:
         status = "▶️ Playing" if music_player.is_playing else "⏸️ Paused"
         embed.add_field(
-            name=f"{status}: {music_player.current_song.title}",
-            value=f"Requested by: {music_player.current_song.requester.mention}",
+            name="🎵 Current Song",
+            value=f"{status} **{music_player.current_song.title}**\nRequested by: {music_player.current_song.requester.mention}",
             inline=False
         )
 
     # Add queue info
     queue_info = music_player.get_queue_info()
     if queue_info['queue']:
-        queue_text = f"**{len(queue_info['queue'])}** song(s) in queue"
+        queue_text = f"📋 **{len(queue_info['queue'])}** song(s) in queue"
         if len(queue_info['queue']) <= 3:
             queue_text += "\n" + "\n".join([f"• {song.title}" for song in queue_info['queue'][:3]])
         embed.add_field(
-            name="📋 Queue",
+            name="‎",  # Invisible character for spacing
             value=queue_text,
             inline=False
         )
     else:
         embed.add_field(
-            name="📋 Queue",
-            value="Empty",
+            name="‎",  # Invisible character for spacing
+            value="📋 Queue is empty",
             inline=False
         )
 
-    embed.set_footer(text="Click buttons to control music • Panel auto-updates")
+    embed.set_footer(text="🎛️ Use the buttons below to control playback")
 
     await interaction.response.send_message(embed=embed, view=view)
 

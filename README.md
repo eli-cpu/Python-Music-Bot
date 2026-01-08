@@ -144,7 +144,7 @@ https://open.spotify.com/track/4uLU6hMCjMI75M1A2tKUQC?si=abc123
    - Extracts track title using Spotify's public oEmbed API (no credentials needed)
    - Searches YouTube for the track title
    - Streams the best YouTube match
-   - *Note:* Artist information is not available without Spotify API credentials
+   - _Note:_ Artist information is not available without Spotify API credentials
 
 ## 🎛️ **All Commands - Fully Implemented:**
 
