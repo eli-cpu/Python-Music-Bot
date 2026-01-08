@@ -88,26 +88,26 @@ class MusicPlayer:
 
             async with aiohttp.ClientSession() as session:
                 async with session.get(oembed_url) as response:
-                    if response.status == 200:
-                        data = await response.json()
-
-                        # Extract title from oEmbed data
-                        title_text = data.get('title', '')
-
-                        if not title_text:
-                            return None
-
-                        # Spotify oEmbed only provides the track title, not the artist
-                        # We'll use just the title for YouTube search - it should be sufficient
-                        # for most popular songs
-            return {
-                            'title': title_text,
-                            'artist': 'Unknown (from Spotify)',  # Placeholder
-                            'query': title_text  # Search YouTube with just the title
-                        }
-                    else:
+                    if response.status != 200:
                         print(f"oEmbed request failed with status: {response.status}")
                         return None
+
+                    data = await response.json()
+
+                    # Extract title from oEmbed data
+                    title_text = data.get('title', '')
+
+                    if not title_text:
+                        return None
+
+                    # Spotify oEmbed only provides the track title, not the artist
+                    # We'll use just the title for YouTube search - it should be sufficient
+                    # for most popular songs
+                    return {
+                        'title': title_text,
+                        'artist': 'Unknown (from Spotify)',  # Placeholder
+                        'query': title_text  # Search YouTube with just the title
+                    }
 
         except Exception as e:
             print(f"Error extracting Spotify info via oEmbed: {e}")
