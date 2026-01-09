@@ -8,9 +8,10 @@ from collections import deque
 # Import YouTube streamer
 from .streaming_youtube import youtube_streamer
 
-# Spotify credentials (optional - no longer required for basic Spotify URL support)
-SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')
-SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')
+# Spotify authentication - token takes priority over client credentials
+SPOTIFY_ACCESS_TOKEN = os.getenv('SPOTIFY_ACCESS_TOKEN')
+SPOTIFY_CLIENT_ID = os.getenv('SPOTIFY_CLIENT_ID')  # Fallback for client credentials flow
+SPOTIFY_CLIENT_SECRET = os.getenv('SPOTIFY_CLIENT_SECRET')  # Fallback for client credentials flow
 
 class Song:
     def __init__(self, title, url, duration, thumbnail=None, requester=None):
@@ -31,6 +32,34 @@ class MusicPlayer:
         self.current_position = 0  # Current playback position in seconds
         self.playback_start_time = None  # When current playback started (for position tracking)
         self.is_seeking = False  # Flag to prevent _after_playing from resetting song during seeks
+        self.last_text_channel = None  # Store last text channel for notifications
+
+        # Initialize Spotify client (token takes priority, then client credentials)
+        if SPOTIFY_ACCESS_TOKEN:
+            try:
+                import spotipy
+                self.spotify = spotipy.Spotify(auth=SPOTIFY_ACCESS_TOKEN)
+                print("Spotify API client initialized with access token.")
+            except Exception as e:
+                print(f"Failed to initialize Spotify client with token: {e}")
+                self.spotify = None
+        elif SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
+            try:
+                import spotipy
+                from spotipy.oauth2 import SpotifyClientCredentials
+
+                client_credentials_manager = SpotifyClientCredentials(
+                    client_id=SPOTIFY_CLIENT_ID,
+                    client_secret=SPOTIFY_CLIENT_SECRET
+                )
+                self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
+                print("Spotify API client initialized with client credentials.")
+            except Exception as e:
+                print(f"Failed to initialize Spotify client with credentials: {e}")
+                self.spotify = None
+        else:
+            print("No Spotify authentication found. Using oEmbed fallback for Spotify URLs.")
+            self.spotify = None
 
     def format_time(self, seconds):
         """Format seconds into HH:MM:SS or MM:SS format"""
@@ -52,36 +81,30 @@ class MusicPlayer:
         # Calculate elapsed time since playback started
         elapsed = time.time() - self.playback_start_time
         return self.current_position + elapsed
-        self.last_text_channel = None  # Store last text channel for notifications
-
-        # Initialize Spotify client (optional - for enhanced features)
-        if SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET:
-            try:
-                import spotipy
-                from spotipy.oauth2 import SpotifyClientCredentials
-
-                client_credentials_manager = SpotifyClientCredentials(
-                    client_id=SPOTIFY_CLIENT_ID,
-                    client_secret=SPOTIFY_CLIENT_SECRET
-                )
-                self.spotify = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
-                print("Spotify API client initialized successfully.")
-            except Exception as e:
-                print(f"Failed to initialize Spotify client: {e}")
-                self.spotify = None
-        else:
-            print("Spotify API credentials not found. Using oEmbed fallback for Spotify URLs.")
-            self.spotify = None
 
     async def extract_spotify_info(self, url):
-        """Extract track information from Spotify URL using oEmbed (no API key required)"""
+        """Extract track information from Spotify URL using API token or oEmbed fallback"""
         # Extract track ID from Spotify URL
         match = re.search(r'spotify\.com/track/([a-zA-Z0-9]+)', url)
         if not match:
             return None
 
+        track_id = match.group(1)
+
+        # Try using Spotify API first if we have authentication
+        if self.spotify:
+            try:
+                track = self.spotify.track(track_id)
+                return {
+                    'title': track['name'],
+                    'artist': ', '.join([artist['name'] for artist in track['artists']]),
+                    'query': f"{track['name']} {track['artists'][0]['name']}"
+                }
+            except Exception as e:
+                print(f"Spotify API request failed, falling back to oEmbed: {e}")
+
+        # Fallback to oEmbed if API is not available or failed
         try:
-            # Use Spotify's oEmbed endpoint (no API key required)
             import aiohttp
 
             oembed_url = f"https://open.spotify.com/oembed?url={url}"
@@ -101,8 +124,7 @@ class MusicPlayer:
                         return None
 
                     # Spotify oEmbed only provides the track title, not the artist
-                    # We'll use just the title for YouTube search - it should be sufficient
-                    # for most popular songs
+                    # We'll use just the title for YouTube search
                     return {
                         'title': title_text,
                         'artist': 'Unknown (from Spotify)',  # Placeholder
