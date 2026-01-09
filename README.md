@@ -54,13 +54,110 @@ pip install -r requirements.txt
   ```
   **Note:** Without PyNaCl, voice commands like `/join`, `/play`, etc. will fail with connection errors.
 
-### 4. Run the Bot
+### 4. Docker Setup (Recommended)
+
+For easier deployment and management, you can run the bot using Docker:
+
+#### Prerequisites
+- Docker installed on your system
+- Docker Compose (optional, for easier management)
+
+#### Quick Start with Docker Compose
+
+1. **Clone the repository:**
+   ```bash
+   git clone <repository-url>
+   cd Python-Music-Bot
+   ```
+
+2. **Create your environment file:**
+   ```bash
+   cp docker-env-example .env
+   # Edit .env with your bot token and optional Spotify credentials
+   ```
+
+3. **Build and run with Docker Compose:**
+   ```bash
+   docker-compose up -d
+   ```
+
+4. **View logs:**
+   ```bash
+   docker-compose logs -f discord-music-bot
+   ```
+
+5. **Stop the bot:**
+   ```bash
+   docker-compose down
+   ```
+
+#### Quick Run Script (Recommended)
+
+Use the provided script for easy setup:
+
+```bash
+# Make sure you have your .env file ready
+cp docker-env-example .env
+# Edit .env with your credentials
+
+# Run the bot
+./docker-run.sh
+```
+
+#### Manual Docker Commands
+
+```bash
+# Build the image
+docker build -t discord-music-bot .
+
+# Run the container
+docker run -d \
+  --name discord-music-bot \
+  --env-file .env \
+  discord-music-bot
+```
+
+#### Docker Environment Variables
+
+Copy `docker-env-example` to `.env` and fill in your credentials:
+
+```bash
+DISCORD_TOKEN=your_bot_token_here
+DISCORD_CLIENT_ID=your_client_id_here
+SPOTIFY_ACCESS_TOKEN=your_spotify_token_here  # Optional
+SPOTIFY_CLIENT_ID=your_spotify_client_id      # Optional
+SPOTIFY_CLIENT_SECRET=your_spotify_secret     # Optional
+```
+
+#### Docker Container Management
+
+```bash
+# View logs
+docker logs -f discord-music-bot
+
+# Stop the bot
+docker stop discord-music-bot
+
+# Start the bot again
+docker start discord-music-bot
+
+# Restart the bot
+docker restart discord-music-bot
+
+# Remove the container
+docker rm discord-music-bot
+
+# Update the bot (rebuild and restart)
+docker build -t discord-music-bot . && docker restart discord-music-bot
+```
+
+### 5. Run the Bot
 
 ```bash
 python bot.py
 ```
 
-### 5. Invite the Bot to Your Server
+### 6. Invite the Bot to Your Server
 
 1. In the Discord Developer Portal, go to "OAuth2" → "URL Generator"
 2. Select the following scopes:
@@ -74,7 +171,7 @@ python bot.py
 4. Copy the generated URL and paste it into your browser
 5. Select your server and authorize the bot
 
-### 6. Verify Setup
+### 7. Verify Setup
 
 Once the bot is running and invited to your server, you should see:
 
