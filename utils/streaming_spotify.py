@@ -33,6 +33,7 @@ class MusicPlayer:
         self.playback_start_time = None  # When current playback started (for position tracking)
         self.is_seeking = False  # Flag to prevent _after_playing from resetting song during seeks
         self.last_text_channel = None  # Store last text channel for notifications
+        self.bot_loop = None  # Store bot's event loop for thread-safe coroutine scheduling
 
         # Initialize Spotify client (token takes priority, then client credentials)
         if SPOTIFY_ACCESS_TOKEN:
@@ -154,11 +155,17 @@ class MusicPlayer:
         if not self.voice_client or not self.voice_client.is_connected():
             try:
                 self.voice_client = await voice_channel.connect()
+                # Store the bot's event loop for thread-safe coroutine scheduling
+                if self.voice_client and hasattr(self.voice_client, 'client'):
+                    self.bot_loop = self.voice_client.client.loop
             except Exception as e:
                 await interaction.followup.send(f"❌ Failed to connect to voice channel: {e}")
                 return
         elif self.voice_client.channel != voice_channel:
             await self.voice_client.move_to(voice_channel)
+            # Ensure we have the event loop
+            if self.voice_client and hasattr(self.voice_client, 'client'):
+                self.bot_loop = self.voice_client.client.loop
 
         # Stream audio in real-time
         try:
@@ -193,14 +200,24 @@ class MusicPlayer:
             await interaction.followup.send(f"❌ Error streaming song: {str(e)}")
 
     def _after_playing(self, error=None):
-        """Called when audio finishes playing"""
+        """Called when audio finishes playing - runs in Discord's player thread"""
         if error:
+            error_str = str(error).lower()
             print(f"Playback error: {error}")
 
+            # Check if this is a recoverable network error (403, connection issues, etc.)
+            is_recoverable = any(keyword in error_str for keyword in [
+                '403', 'forbidden', 'connection reset', 'timeout', 
+                'network', 'http error', 'server returned'
+            ])
+
             # Check if this is a recoverable network error and we're not seeking
-            if not self.is_seeking and self.current_song and self.voice_client and self.voice_client.is_connected():
+            if is_recoverable and not self.is_seeking and self.current_song and self.voice_client and self.voice_client.is_connected():
                 # Attempt to recover from stream failure
-                asyncio.create_task(self._attempt_stream_recovery(error))
+                # Use thread-safe coroutine scheduling since we're in a different thread
+                loop = self._get_event_loop()
+                if loop:
+                    asyncio.run_coroutine_threadsafe(self._attempt_stream_recovery(error), loop)
                 return  # Don't reset state yet, recovery might succeed
 
         # Add current song to history if it exists and we're not seeking
@@ -223,7 +240,33 @@ class MusicPlayer:
         self._schedule_leave_check()
 
         # Auto-send control panel when song finishes (for next song)
-        asyncio.create_task(self._send_control_panel())
+        # Use thread-safe coroutine scheduling since we're in a different thread
+        loop = self._get_event_loop()
+        if loop:
+            asyncio.run_coroutine_threadsafe(self._send_control_panel(), loop)
+
+    def _get_event_loop(self):
+        """Get the bot's event loop for thread-safe coroutine scheduling"""
+        # Try to get loop from stored reference
+        if self.bot_loop and self.bot_loop.is_running():
+            return self.bot_loop
+        
+        # Try to get from voice_client
+        if self.voice_client and hasattr(self.voice_client, 'client'):
+            loop = self.voice_client.client.loop
+            if loop and loop.is_running():
+                self.bot_loop = loop  # Cache it for next time
+                return loop
+        
+        # Try to get the running loop (might work if we're in the main thread)
+        try:
+            loop = asyncio.get_running_loop()
+            self.bot_loop = loop
+            return loop
+        except RuntimeError:
+            pass
+        
+        return None
 
     async def _send_control_panel(self):
         """Send the music control panel to the last text channel"""
