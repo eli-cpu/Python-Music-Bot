@@ -202,23 +202,45 @@ class MusicPlayer:
     def _after_playing(self, error=None):
         """Called when audio finishes playing - runs in Discord's player thread"""
         if error:
-            error_str = str(error).lower()
-            print(f"Playback error: {error}")
+            # Convert error to string for checking, handling both Exception objects and strings
+            if isinstance(error, Exception):
+                error_str = str(error).lower()
+                error_type = type(error).__name__.lower()
+            else:
+                error_str = str(error).lower()
+                error_type = ''
+
+            print(f"Playback error: {error} (type: {type(error).__name__})")
 
             # Check if this is a recoverable network error (403, connection issues, etc.)
+            # Check both error string and type name
             is_recoverable = any(keyword in error_str for keyword in [
                 '403', 'forbidden', 'connection reset', 'timeout', 
-                'network', 'http error', 'server returned'
-            ])
+                'network', 'http error', 'server returned', 'access denied',
+                'error opening input', 'ffmpeg'
+            ]) or any(keyword in error_type for keyword in ['connection', 'timeout', 'http'])
 
             # Check if this is a recoverable network error and we're not seeking
             if is_recoverable and not self.is_seeking and self.current_song and self.voice_client and self.voice_client.is_connected():
+                print(f"Detected recoverable error, attempting stream recovery...")
                 # Attempt to recover from stream failure
                 # Use thread-safe coroutine scheduling since we're in a different thread
                 loop = self._get_event_loop()
                 if loop:
                     asyncio.run_coroutine_threadsafe(self._attempt_stream_recovery(error), loop)
+                else:
+                    print("Warning: Could not get event loop for recovery, will reset state")
+                    # If we can't recover, don't clear the song immediately - let it try again
+                    self.is_playing = False
                 return  # Don't reset state yet, recovery might succeed
+            else:
+                # Non-recoverable error or conditions not met for recovery
+                if not is_recoverable:
+                    print(f"Error is not recoverable or recovery conditions not met")
+                if not self.current_song:
+                    print("No current song to recover")
+                if not self.voice_client or not self.voice_client.is_connected():
+                    print("Voice client not connected")
 
         # Add current song to history if it exists and we're not seeking
         if self.current_song and not self.is_seeking:
@@ -234,7 +256,14 @@ class MusicPlayer:
         # Auto-play next song in queue if available
         # Note: This is called from Discord's voice client, which runs in a separate thread
         # We can't directly send messages here, but we can prepare for the next song
-        print(f"Queue has {len(self.queue)} songs remaining")
+        if self.queue:
+            print(f"Queue has {len(self.queue)} song(s) remaining, will auto-play next")
+            # Try to play next song in queue
+            loop = self._get_event_loop()
+            if loop:
+                asyncio.run_coroutine_threadsafe(self._play_next_in_queue(), loop)
+        else:
+            print(f"Queue is empty (no songs remaining)")
 
         # Check if we should leave the channel after song ends
         self._schedule_leave_check()
@@ -330,6 +359,12 @@ class MusicPlayer:
         """Attempt to recover from a stream failure by refreshing the URL and restarting"""
         try:
             print("Attempting to recover from stream failure...")
+            # Notify user that recovery is being attempted
+            if self.last_text_channel and self.current_song:
+                try:
+                    await self.last_text_channel.send(f"🔄 Recovering stream for **{self.current_song.title}**...")
+                except:
+                    pass  # Don't fail recovery if we can't send message
 
             # Wait a moment before attempting recovery
             await asyncio.sleep(1)
@@ -363,15 +398,140 @@ class MusicPlayer:
                 self.is_playing = True
                 self.playback_start_time = time.time()
                 # Don't reset current_position since we're resuming from it
+                if self.last_text_channel and self.current_song:
+                    try:
+                        await self.last_text_channel.send(f"✅ Successfully recovered stream for **{self.current_song.title}**")
+                    except:
+                        pass
             else:
-                print("Stream recovery failed, resetting song state")
-                self.current_song = None
+                print("Stream recovery failed, will try next song in queue or reset")
+                # Don't clear current_song yet - let _after_playing handle it
+                # This allows the queue auto-play logic to work
                 self.is_playing = False
+                # Trigger the after_playing logic to handle queue or cleanup
+                loop = self._get_event_loop()
+                if loop:
+                    # Schedule a call to continue the after_playing logic
+                    asyncio.run_coroutine_threadsafe(self._handle_recovery_failure(), loop)
 
         except Exception as e:
             print(f"Error during stream recovery: {e}")
-            # Ensure we reset state on recovery failure
-            self.current_song = None
+            # Trigger failure handling
+            loop = self._get_event_loop()
+            if loop:
+                asyncio.run_coroutine_threadsafe(self._handle_recovery_failure(), loop)
+
+    async def _play_next_in_queue(self):
+        """Auto-play the next song in the queue"""
+        try:
+            if not self.queue:
+                return
+
+            if not self.voice_client or not self.voice_client.is_connected():
+                print("Cannot play next song: voice client not connected")
+                return
+
+            next_song = self.queue.popleft()
+            print(f"Auto-playing next song: {next_song.title}")
+
+            # Get fresh stream URL
+            stream_url = await youtube_streamer.get_stream_url(next_song.url)
+            if not stream_url:
+                print(f"Failed to get stream URL for {next_song.title}, trying next song")
+                # Try next song in queue
+                if self.queue:
+                    await self._play_next_in_queue()
+                else:
+                    self.current_song = None
+                return
+
+            # Add previous song to history
+            if self.current_song:
+                self.history.append(self.current_song)
+
+            # Play the next song
+            success = await youtube_streamer.stream_audio(
+                self.voice_client,
+                stream_url,
+                lambda e: self._after_playing(e),
+                0
+            )
+
+            if success:
+                self.current_song = next_song
+                self.is_playing = True
+                self.current_position = 0
+                self.playback_start_time = time.time()
+                
+                if self.last_text_channel:
+                    await self.last_text_channel.send(f"🎵 Now playing: **{next_song.title}**")
+                
+                # Send control panel
+                await self._send_control_panel()
+            else:
+                print(f"Failed to start next song, trying next in queue")
+                # Try next song
+                if self.queue:
+                    await self._play_next_in_queue()
+                else:
+                    self.current_song = None
+
+        except Exception as e:
+            print(f"Error playing next song in queue: {e}")
+            if not self.is_seeking:
+                self.current_song = None
+            self.is_playing = False
+
+    async def _handle_recovery_failure(self):
+        """Handle the case when stream recovery fails - try next song or cleanup"""
+        try:
+            # Add current song to history if it exists
+            if self.current_song and not self.is_seeking:
+                self.history.append(self.current_song)
+
+            self.is_playing = False
+            self.playback_start_time = None
+
+            # Try to play next song in queue if available
+            if self.queue:
+                print(f"Recovery failed, trying next song in queue ({len(self.queue)} songs remaining)")
+                next_song = self.queue.popleft()
+                self.current_song = next_song
+                
+                # Get a fresh stream URL for the next song
+                stream_url = await youtube_streamer.get_stream_url(next_song.url)
+                if stream_url:
+                    success = await youtube_streamer.stream_audio(
+                        self.voice_client,
+                        stream_url,
+                        lambda e: self._after_playing(e),
+                        0
+                    )
+                    if success:
+                        self.is_playing = True
+                        self.playback_start_time = time.time()
+                        if self.last_text_channel:
+                            await self.last_text_channel.send(f"🎵 Now playing: **{next_song.title}** (recovered from previous error)")
+                        return
+
+            # No queue or next song failed, reset state
+            print("No more songs in queue after recovery failure")
+            if not self.is_seeking:
+                self.current_song = None
+
+            # Schedule leave check
+            self._schedule_leave_check()
+
+            # Send control panel update
+            loop = self._get_event_loop()
+            if loop:
+                asyncio.run_coroutine_threadsafe(self._send_control_panel(), loop)
+
+        except Exception as e:
+            print(f"Error handling recovery failure: {e}")
+            # Final cleanup
+            if not self.is_seeking:
+                self.current_song = None
             self.is_playing = False
 
     async def add_to_queue(self, song):
