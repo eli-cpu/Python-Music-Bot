@@ -32,6 +32,13 @@ class YouTubeStreamer:
             'extractor_retries': 3,  # Retry extracting info
             'file_access_retries': 3,  # Retry file access
             'concurrent_fragment_downloads': 1,  # Avoid overloading
+            # YouTube extractor args to handle PO token requirement
+            # Use clients that don't require PO tokens by default
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],  # Use Android client (no PO token needed) with web fallback
+                }
+            }
         }
 
     async def search_youtube(self, query):

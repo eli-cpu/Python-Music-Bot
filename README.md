@@ -468,6 +468,15 @@ Tests:
 - **Permission errors**: Ensure the bot has proper permissions in your server
 - **Connection issues**: Check that your bot token is valid and hasn't expired
 
+### YouTube Token Issues
+
+**Note**: YouTube has implemented Proof of Origin (PO) token requirements. The bot is configured to use the Android client which doesn't require PO tokens, so you shouldn't encounter any issues. The bot will automatically fall back to the web client if needed.
+
+If you experience HTTP 403 errors when playing YouTube videos:
+1. Make sure you have yt-dlp version 2024.8.0 or later installed
+2. The bot will automatically try alternative clients
+3. If issues persist, try updating yt-dlp: `pip install --upgrade yt-dlp`
+
 ### Stream Issues & Recovery
 
 The bot includes an **automatic stream recovery system** that handles common streaming problems:
