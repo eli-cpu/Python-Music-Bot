@@ -38,10 +38,13 @@ function PlayerScreen({ route, navigation }) {
     setLoading(true);
     try {
       const streamData = await ApiService.getStream(track.id);
-      // In a real app, you would use react-native-track-player here
+      
+      // TODO: Integrate react-native-track-player for actual audio playback
+      // Currently displays URL for development/testing purposes
+      // See: https://github.com/doublesymmetry/react-native-track-player
       console.log('Stream URL:', streamData.url);
       setPlaying(true);
-      alert('Playing track (audio player integration needed)');
+      alert('Audio player integration in progress. Stream URL logged to console.');
     } catch (error) {
       console.error('Error playing track:', error);
       alert('Failed to play track');

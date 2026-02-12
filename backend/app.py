@@ -16,7 +16,18 @@ import yt_dlp
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', os.urandom(24))
+
+# Require secret key to be set explicitly for production safety
+if not os.getenv('FLASK_SECRET_KEY'):
+    # For development only - generate a temporary key
+    if os.getenv('FLASK_ENV') == 'development':
+        app.secret_key = os.urandom(24)
+        print("Warning: Using temporary secret key for development. Set FLASK_SECRET_KEY for production.")
+    else:
+        raise ValueError("FLASK_SECRET_KEY environment variable must be set for production")
+else:
+    app.secret_key = os.getenv('FLASK_SECRET_KEY')
+
 CORS(app, supports_credentials=True)
 
 # Spotify configuration

@@ -75,7 +75,6 @@ function Search() {
               <div 
                 key={track.id} 
                 className="track-item"
-                onClick={() => playTrack(track.id, `${track.name} ${track.artists.join(' ')}`)}
               >
                 {track.image && (
                   <img 
@@ -92,10 +91,7 @@ function Search() {
                 <button 
                   className="btn" 
                   style={{ fontSize: '0.9rem', padding: '0.5rem 1rem' }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    playTrack(track.id, `${track.name} ${track.artists.join(' ')}`);
-                  }}
+                  onClick={() => playTrack(track.id, `${track.name} ${track.artists.join(' ')}`)}
                 >
                   Play
                 </button>
