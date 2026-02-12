@@ -11,7 +11,7 @@ class MusicControlView(ui.View):
 
         # Add GitHub link button
         github_button = ui.Button(
-            label="🔗 GitHub",
+            label="GitHub",
             style=discord.ButtonStyle.link,
             url="https://github.com/eli-cpu",
             emoji="🔗",

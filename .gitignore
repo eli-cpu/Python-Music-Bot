@@ -35,3 +35,27 @@ coverage.xml
 # OS
 .DS_Store
 Thumbs.db
+
+# Node / Frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+frontend/build/
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+
+# Mobile
+mobile/node_modules/
+mobile/android/build/
+mobile/ios/build/
+mobile/android/.gradle/
+mobile/.expo/
+mobile/.expo-shared/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
